@@ -1,8 +1,8 @@
 package com.devicescope.app.ui
 
 import android.app.Activity
-import androidx.compose.foundation.Arrangement
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,7 +46,8 @@ private object Routes {
 
 @Composable
 fun DeviceScopeApp() {
-    var darkTheme by rememberSaveable { mutableStateOf(isSystemInDarkTheme()) }
+    val systemDarkTheme = isSystemInDarkTheme()
+    var darkTheme by rememberSaveable { mutableStateOf(systemDarkTheme) }
 
     DeviceScopeTheme(darkTheme = darkTheme) {
         DeviceScopeContent(

@@ -82,8 +82,10 @@ internal fun ColumnScope.ConnectionsDiagnosticContent() {
     val hasBluetoothFeature = remember(context) {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH)
     }
-    val wifiPermission = remember(context) { wifiDetailsPermission() }
-    var hasWifiPermission by remember(context) { mutableStateOf(hasPermission(context, wifiPermission)) }
+    val wifiPermission = remember { wifiDetailsPermission() }
+    var hasWifiPermission by remember(context) {
+        mutableStateOf(wifiPermission?.let { hasPermission(context, it) } ?: true)
+    }
     var hasBluetoothPermission by remember(context) {
         mutableStateOf(Build.VERSION.SDK_INT < Build.VERSION_CODES.S || hasPermission(context, Manifest.permission.BLUETOOTH_CONNECT))
     }
@@ -94,7 +96,7 @@ internal fun ColumnScope.ConnectionsDiagnosticContent() {
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) { result ->
-        hasWifiPermission = hasPermission(context, wifiPermission)
+        hasWifiPermission = wifiPermission?.let { hasPermission(context, it) } ?: true
         hasBluetoothPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
             hasPermission(context, Manifest.permission.BLUETOOTH_CONNECT)
         if (result.isNotEmpty()) refreshKey++
@@ -103,13 +105,13 @@ internal fun ColumnScope.ConnectionsDiagnosticContent() {
     LaunchedEffect(hasWifiPermission, hasBluetoothPermission, refreshKey) {
         isLoading = true
         snapshot = withContext(Dispatchers.IO) {
-            readConnectionSnapshot(context.applicationContext, hasWifiPermission, hasBluetoothPermission)
+            readConnectionSnapshot(context.applicationContext, hasBluetoothPermission)
         }
         isLoading = false
     }
 
     val missingPermissions = buildList {
-        if (hasWifiFeature && !hasWifiPermission) add(wifiPermission)
+        if (hasWifiFeature && !hasWifiPermission) wifiPermission?.let { add(it) }
         if (hasBluetoothFeature && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !hasBluetoothPermission) {
             add(Manifest.permission.BLUETOOTH_CONNECT)
         }
@@ -158,10 +160,17 @@ internal fun ColumnScope.ConnectionsDiagnosticContent() {
                 },
                 details = buildList {
                     if (data.wifiConnected) {
-                        add("SSID: ${data.ssid ?: if (hasWifiPermission) "No disponible" else "Permiso requerido"}")
-                        add("Señal: ${data.wifiRssi?.let { "$it dBm · ${wifiBars(it)} de 4 barras" } ?: if (hasWifiPermission) "No disponible" else "Permiso requerido"}")
-                    } else if (hasWifiFeature && !hasWifiPermission) {
-                        add("Permite el acceso opcional para mostrar SSID y señal.")
+                        add(
+                            "SSID: " + (data.ssid ?: when {
+                                wifiPermission == null -> "No disponible (requiere Android 13+)"
+                                !hasWifiPermission -> "Permiso requerido"
+                                else -> "No disponible"
+                            }),
+                        )
+                        add("Señal: ${data.wifiRssi?.let { "$it dBm · ${wifiBars(it)} de 4 barras" } ?: "No disponible"}")
+                    }
+                    if (data.wifiConnected && wifiPermission != null && !hasWifiPermission) {
+                        add("Permite Dispositivos cercanos para mostrar el SSID.")
                     }
                 },
             )
@@ -221,7 +230,7 @@ internal fun ColumnScope.ConnectionsDiagnosticContent() {
         if (missingPermissions.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             ConnectionPermissionCard(
-                wifiPermissionNeeded = hasWifiFeature && !hasWifiPermission,
+                wifiPermissionNeeded = hasWifiFeature && wifiPermission != null && !hasWifiPermission,
                 bluetoothPermissionNeeded = hasBluetoothFeature && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !hasBluetoothPermission,
                 onRequest = { permissionLauncher.launch(missingPermissions.toTypedArray()) },
             )
@@ -261,7 +270,7 @@ internal fun ColumnScope.ConnectionsDiagnosticContent() {
             ) {
                 Icon(Icons.Filled.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp))
                 Text(
-                    text = "DeviceScope no activa Wi-Fi, Bluetooth, NFC ni GPS. No busca dispositivos cercanos y no solicita permiso para leer coordenadas.",
+                    text = "DeviceScope no activa Wi-Fi, Bluetooth, NFC ni GPS. No busca dispositivos cercanos y no declara ni solicita permiso de ubicación.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -391,19 +400,11 @@ private fun ConnectionPermissionCard(
             )
             Spacer(Modifier.height(5.dp))
             val needed = buildList {
-                if (wifiPermissionNeeded) {
-                    add(
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            "Dispositivos cercanos para SSID/señal"
-                        } else {
-                            "Ubicación precisa para que Android revele SSID/señal (sin leer coordenadas)"
-                        },
-                    )
-                }
+                if (wifiPermissionNeeded) add("Dispositivos cercanos para mostrar el SSID")
                 if (bluetoothPermissionNeeded) add("Bluetooth Connect para consultar su estado")
             }.joinToString(" y ")
             Text(
-                text = "Permisos opcionales: $needed. No se escanean redes ni dispositivos y no se obtienen coordenadas.",
+                text = "Permisos opcionales: $needed. No se escanea ninguna red ni se obtiene ubicación.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -417,7 +418,6 @@ private fun ConnectionPermissionCard(
 
 private fun readConnectionSnapshot(
     context: Context,
-    hasWifiPermission: Boolean,
     hasBluetoothPermission: Boolean,
 ): ConnectionSnapshot {
     val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
@@ -438,7 +438,9 @@ private fun readConnectionSnapshot(
     val wifiConnected = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
     val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
     val wifiEnabled = runCatching { wifiManager?.isWifiEnabled }.getOrNull()
-    val wifiInfo = if (hasWifiPermission && wifiConnected) {
+    // RSSI is readable without a dangerous permission; SSID is redacted unless
+    // NEARBY_WIFI_DEVICES (Android 13+) is granted.
+    val wifiInfo = if (wifiConnected) {
         runCatching { wifiManager?.connectionInfo }.getOrNull()
     } else {
         null
@@ -484,10 +486,10 @@ private fun readConnectionSnapshot(
     )
 }
 
-private fun wifiDetailsPermission(): String = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+private fun wifiDetailsPermission(): String? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
     Manifest.permission.NEARBY_WIFI_DEVICES
 } else {
-    Manifest.permission.ACCESS_FINE_LOCATION
+    null
 }
 
 private fun hasPermission(context: Context, permission: String): Boolean =

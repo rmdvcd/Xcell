@@ -1,9 +1,7 @@
 package com.devicescope.app.ui.screens
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
-import android.os.Build
 import android.telephony.TelephonyManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -48,21 +46,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.devicescope.app.data.DeviceReading
 import com.devicescope.app.data.ModuleStatus
+import com.devicescope.app.data.SimSnapshot
+import com.devicescope.app.data.TelephonyDiagnosticReader
+import com.devicescope.app.data.valueOrNull
 import com.devicescope.app.ui.components.StatusPill
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
-
-private data class SimSnapshot(
-    val supported: Boolean,
-    val simState: Int,
-    val operatorName: String?,
-    val countryIso: String?,
-    val signalLevel: Int?,
-    val signalDbm: Int?,
-    val permissionError: Boolean = false,
-)
 
 @Composable
 internal fun ColumnScope.SimDiagnosticContent() {
@@ -79,6 +71,7 @@ internal fun ColumnScope.SimDiagnosticContent() {
         )
     }
     var snapshot by remember { mutableStateOf<SimSnapshot?>(null) }
+    var loadError by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var refreshKey by remember { mutableStateOf(0) }
 
@@ -91,8 +84,26 @@ internal fun ColumnScope.SimDiagnosticContent() {
 
     LaunchedEffect(hasPhonePermission, refreshKey) {
         isLoading = true
-        snapshot = withContext(Dispatchers.IO) {
-            readSimSnapshot(context.applicationContext, hasPhonePermission)
+        loadError = null
+        when (val result = withContext(Dispatchers.IO) {
+            TelephonyDiagnosticReader.read(context.applicationContext, hasPhonePermission)
+        }) {
+            is DeviceReading.Available -> {
+                snapshot = result.value
+                loadError = null
+            }
+            DeviceReading.NotAvailable -> {
+                snapshot = null
+                loadError = "No se pudo consultar la telefonía de este dispositivo."
+            }
+            is DeviceReading.Failed -> {
+                snapshot = null
+                loadError = if (result.error is SecurityException) {
+                    "Android no autorizó la consulta de telefonía."
+                } else {
+                    "No se pudo consultar la telefonía de este dispositivo."
+                }
+            }
         }
         isLoading = false
     }
@@ -132,6 +143,15 @@ internal fun ColumnScope.SimDiagnosticContent() {
             Spacer(Modifier.height(14.dp))
         }
 
+        loadError?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(Modifier.height(14.dp))
+        }
+
         snapshot?.let { data ->
             SimStatusCard(snapshot = data, isLoading = isLoading)
             Spacer(Modifier.height(13.dp))
@@ -147,7 +167,7 @@ internal fun ColumnScope.SimDiagnosticContent() {
                         value = when {
                             !data.supported -> "No disponible"
                             !hasPhonePermission -> "Permiso requerido"
-                            else -> data.operatorName ?: "No disponible"
+                            else -> simValue(data.operatorName) { it }
                         },
                     )
                     SimValueRow(
@@ -156,7 +176,7 @@ internal fun ColumnScope.SimDiagnosticContent() {
                         value = when {
                             !data.supported -> "No disponible"
                             !hasPhonePermission -> "Permiso requerido"
-                            else -> countryLabel(data.countryIso)
+                            else -> simValue(data.countryIso) { countryLabel(it) }
                         },
                     )
                     SimValueRow(
@@ -165,7 +185,10 @@ internal fun ColumnScope.SimDiagnosticContent() {
                         value = when {
                             !data.supported -> "No disponible"
                             !hasPhonePermission -> "Permiso requerido"
-                            else -> signalLabel(data.signalLevel, data.signalDbm)
+                            else -> signalLabel(
+                                data.signalLevel.valueOrNull,
+                                data.signalDbm.valueOrNull,
+                            )
                         },
                     )
                     if (data.permissionError) {
@@ -271,14 +294,19 @@ private fun PermissionCard(onRequestPermission: () -> Unit) {
 
 @Composable
 private fun SimStatusCard(snapshot: SimSnapshot, isLoading: Boolean) {
+    val simState = snapshot.simState.valueOrNull
     val status = when {
         !snapshot.supported -> ModuleStatus.WARNING
-        snapshot.simState == TelephonyManager.SIM_STATE_READY -> ModuleStatus.OK
-        snapshot.simState == TelephonyManager.SIM_STATE_ABSENT -> ModuleStatus.WARNING
-        snapshot.simState == TelephonyManager.SIM_STATE_UNKNOWN -> ModuleStatus.WARNING
+        simState == TelephonyManager.SIM_STATE_READY -> ModuleStatus.OK
+        simState == TelephonyManager.SIM_STATE_ABSENT -> ModuleStatus.WARNING
+        simState == TelephonyManager.SIM_STATE_UNKNOWN || simState == null -> ModuleStatus.WARNING
         else -> ModuleStatus.ERROR
     }
-    val stateName = if (!snapshot.supported) "Telefonía no disponible" else simStateName(snapshot.simState)
+    val stateName = when {
+        !snapshot.supported -> "Telefonía no disponible"
+        snapshot.simState is DeviceReading.Failed -> "Estado de SIM no disponible"
+        else -> simStateName(simState ?: TelephonyManager.SIM_STATE_UNKNOWN)
+    }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -373,65 +401,10 @@ private fun LocalOnlyNote() {
     }
 }
 
-private fun readSimSnapshot(context: Context, hasPhonePermission: Boolean): SimSnapshot {
-    val hasTelephony = context.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)
-    val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
-    if (!hasTelephony || telephonyManager == null) {
-        return SimSnapshot(
-            supported = false,
-            simState = TelephonyManager.SIM_STATE_UNKNOWN,
-            operatorName = null,
-            countryIso = null,
-            signalLevel = null,
-            signalDbm = null,
-        )
-    }
-
-    val simState = telephonyManager.getSimState()
-    if (!hasPhonePermission) {
-        return SimSnapshot(
-            supported = true,
-            simState = simState,
-            operatorName = null,
-            countryIso = null,
-            signalLevel = null,
-            signalDbm = null,
-        )
-    }
-
-    return try {
-        val signal = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            telephonyManager.getSignalStrength()
-        } else {
-            null
-        }
-        val level = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) signal?.level else null
-        val dbm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            signal?.cellSignalStrengths
-                ?.map { it.dbm }
-                ?.firstOrNull { it in -150..-1 }
-        } else {
-            null
-        }
-        SimSnapshot(
-            supported = true,
-            simState = simState,
-            operatorName = telephonyManager.getSimOperatorName().takeIf(String::isNotBlank),
-            countryIso = telephonyManager.getSimCountryIso().takeIf(String::isNotBlank),
-            signalLevel = level?.takeIf { it in 0..4 },
-            signalDbm = dbm,
-        )
-    } catch (_: SecurityException) {
-        SimSnapshot(
-            supported = true,
-            simState = simState,
-            operatorName = null,
-            countryIso = null,
-            signalLevel = null,
-            signalDbm = null,
-            permissionError = true,
-        )
-    }
+private fun <T> simValue(reading: DeviceReading<T>, format: (T) -> String): String = when (reading) {
+    is DeviceReading.Available -> format(reading.value)
+    is DeviceReading.Failed -> if (reading.error is SecurityException) "Permiso requerido" else "No disponible"
+    DeviceReading.NotAvailable -> "No disponible"
 }
 
 private fun simStateName(state: Int): String = when (state) {

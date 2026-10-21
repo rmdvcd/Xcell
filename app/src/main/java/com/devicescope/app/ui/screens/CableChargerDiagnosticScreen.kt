@@ -1,9 +1,5 @@
 package com.devicescope.app.ui.screens
 
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.hardware.usb.UsbManager
 import android.os.BatteryManager
 import android.os.SystemClock
 import androidx.compose.foundation.background
@@ -53,8 +49,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.devicescope.app.data.BatteryDiagnosticReader
+import com.devicescope.app.data.BatterySnapshot
 import com.devicescope.app.data.DeviceModule
+import com.devicescope.app.data.DeviceReading
 import com.devicescope.app.data.ModuleStatus
+import com.devicescope.app.data.PowerEstimator
+import com.devicescope.app.data.PowerSummary
+import com.devicescope.app.data.UsbDiagnosticReader
+import com.devicescope.app.data.valueOrNull
 import com.devicescope.app.ui.components.StatusPill
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -81,24 +84,6 @@ private enum class MeasurementInterruption {
     READ_FAILURE,
 }
 
-private data class BatteryReading(
-    val voltageMv: Int?,
-    val temperatureTenthsC: Int?,
-    val currentUa: Long?,
-    val pluggedSource: Int,
-    val batteryStatus: Int,
-)
-
-private data class PowerSummary(
-    val averageVoltageMv: Double?,
-    val averageTemperatureTenthsC: Double?,
-    val averageCurrentMagnitudeUa: Double?,
-    val estimatedPowerW: Double?,
-    val sampleCount: Int,
-    val wiredChargeSamples: Int,
-    val wirelessChargeDetected: Boolean,
-)
-
 private data class ChargerReference(
     val label: String,
     val voltage: Double,
@@ -108,10 +93,10 @@ private data class ChargerReference(
 }
 
 private data class UsbDataCheck(
-    val deviceCount: Int?,
+    val deviceCount: DeviceReading<Int>,
     val pluggedSource: Int,
 ) {
-    val hasDataDevice: Boolean get() = (deviceCount ?: 0) > 0
+    val hasDataDevice: Boolean get() = (deviceCount.valueOrNull ?: 0) > 0
 }
 
 private val commonChargerReferences = listOf(
@@ -125,7 +110,7 @@ internal fun ColumnScope.CableChargerDiagnosticContent(module: DeviceModule) {
     val context = LocalContext.current.applicationContext
     val view = LocalView.current
     var stage by remember { mutableStateOf(CableDiagnosticStage.CONNECT) }
-    var latestReading by remember { mutableStateOf<BatteryReading?>(null) }
+    var latestReading by remember { mutableStateOf<BatterySnapshot?>(null) }
     var powerSummary by remember { mutableStateOf<PowerSummary?>(null) }
     var usbDataCheck by remember { mutableStateOf<UsbDataCheck?>(null) }
     var selectedReference by remember { mutableStateOf<ChargerReference?>(null) }
@@ -145,19 +130,26 @@ internal fun ColumnScope.CableChargerDiagnosticContent(module: DeviceModule) {
         usbDataCheck = null
         interruption = null
         remainingSeconds = 10
-        val readings = mutableListOf<BatteryReading>()
+        val readings = mutableListOf<BatterySnapshot>()
         val startedAt = SystemClock.elapsedRealtime()
         var stoppedForHeat = false
         var readingFailed = false
 
         while (true) {
-            val reading = try {
-                withContext(Dispatchers.IO) { readBatteryReading(context) }
+            val result = try {
+                withContext(Dispatchers.IO) { BatteryDiagnosticReader.read(context) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 readingFailed = true
                 break
+            }
+            val reading = when (result) {
+                is DeviceReading.Available -> result.value
+                DeviceReading.NotAvailable, is DeviceReading.Failed -> {
+                    readingFailed = true
+                    break
+                }
             }
 
             latestReading = reading
@@ -167,7 +159,7 @@ internal fun ColumnScope.CableChargerDiagnosticContent(module: DeviceModule) {
             val remainingMillis = (MEASUREMENT_DURATION_MS - elapsed).coerceAtLeast(0L)
             remainingSeconds = ((remainingMillis + 999L) / 1_000L).toInt()
 
-            if ((reading.temperatureTenthsC ?: 0) >= HIGH_TEMPERATURE_TENTHS_C) {
+            if ((reading.temperatureTenthsC.valueOrNull ?: 0) >= HIGH_TEMPERATURE_TENTHS_C) {
                 stoppedForHeat = true
                 break
             }
@@ -188,10 +180,13 @@ internal fun ColumnScope.CableChargerDiagnosticContent(module: DeviceModule) {
                 stage = CableDiagnosticStage.INTERRUPTED
             }
             else -> {
-                powerSummary = summarizeReadings(readings)
-                val source = readings.lastOrNull()?.pluggedSource ?: 0
+                powerSummary = PowerEstimator.summarize(readings)
+                val source = readings.lastOrNull()?.pluggedSource?.valueOrNull ?: 0
                 usbDataCheck = withContext(Dispatchers.IO) {
-                    inspectUsbData(context, source)
+                    UsbDataCheck(
+                        deviceCount = UsbDiagnosticReader.readDeviceCount(context),
+                        pluggedSource = source,
+                    )
                 }
                 remainingSeconds = 0
                 stage = CableDiagnosticStage.COMPLETE
@@ -201,7 +196,7 @@ internal fun ColumnScope.CableChargerDiagnosticContent(module: DeviceModule) {
 
     val isMeasuring = stage == CableDiagnosticStage.MEASURING
     val isFirstStepDone = stage != CableDiagnosticStage.CONNECT
-    val lastTemperature = latestReading?.temperatureTenthsC
+    val lastTemperature = latestReading?.temperatureTenthsC?.valueOrNull
     val measurementStatus = when {
         lastTemperature != null && lastTemperature >= HIGH_TEMPERATURE_TENTHS_C -> ModuleStatus.ERROR
         lastTemperature != null && lastTemperature >= 400 -> ModuleStatus.WARNING
@@ -507,10 +502,16 @@ private fun MeasurementTimer(remainingSeconds: Int) {
 
 @Composable
 private fun LiveMeasurementsCard(
-    reading: BatteryReading?,
+    reading: BatterySnapshot?,
     isMeasuring: Boolean,
     status: ModuleStatus,
 ) {
+    val voltageMv = reading?.voltageMv?.valueOrNull
+    val temperatureTenthsC = reading?.temperatureTenthsC?.valueOrNull
+    val currentUa = reading?.currentUa?.valueOrNull
+    val pluggedSource = reading?.pluggedSource?.valueOrNull
+    val batteryStatus = reading?.batteryStatus?.valueOrNull
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
@@ -539,11 +540,11 @@ private fun LiveMeasurementsCard(
                 label = "Voltaje",
                 value = when {
                     reading == null -> "Esperando lectura…"
-                    reading.voltageMv == null -> "No disponible"
-                    else -> "${reading.voltageMv} mV"
+                    voltageMv == null -> "No disponible"
+                    else -> "$voltageMv mV"
                 },
                 supportingText = when {
-                    reading?.voltageMv != null -> "≈ ${formatVoltage(reading.voltageMv.toDouble())}"
+                    voltageMv != null -> "≈ ${formatVoltage(voltageMv.toDouble())}"
                     reading == null -> "BatteryManager.EXTRA_VOLTAGE"
                     else -> "BatteryManager.EXTRA_VOLTAGE no está disponible"
                 },
@@ -553,11 +554,11 @@ private fun LiveMeasurementsCard(
                 label = "Temperatura",
                 value = when {
                     reading == null -> "Esperando lectura…"
-                    reading.temperatureTenthsC == null -> "No disponible"
-                    else -> "${reading.temperatureTenthsC} décimas de °C"
+                    temperatureTenthsC == null -> "No disponible"
+                    else -> "$temperatureTenthsC décimas de °C"
                 },
                 supportingText = when {
-                    reading?.temperatureTenthsC != null -> formatTemperature(reading.temperatureTenthsC.toDouble())
+                    temperatureTenthsC != null -> formatTemperature(temperatureTenthsC.toDouble())
                     reading == null -> "BatteryManager.EXTRA_TEMPERATURE"
                     else -> "BatteryManager.EXTRA_TEMPERATURE no está disponible"
                 },
@@ -567,21 +568,28 @@ private fun LiveMeasurementsCard(
                 label = "Corriente instantánea",
                 value = when {
                     reading == null -> "Esperando lectura…"
-                    reading.currentUa == null -> "No disponible"
-                    else -> formatSignedMicroamps(reading.currentUa)
+                    currentUa == null -> "No disponible"
+                    else -> formatSignedMicroamps(currentUa)
                 },
                 supportingText = when {
                     reading == null -> "BATTERY_PROPERTY_CURRENT_NOW"
-                    reading.currentUa == null -> "Este dispositivo no expone BATTERY_PROPERTY_CURRENT_NOW"
+                    currentUa == null -> "Este dispositivo no expone BATTERY_PROPERTY_CURRENT_NOW"
                     else -> "µA · el signo puede variar según el fabricante"
                 },
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             LiveMetricRow(
                 label = "Fuente de carga",
-                value = reading?.let { describePowerSource(it.pluggedSource) } ?: "Esperando lectura",
-                supportingText = reading?.let { describeBatteryState(it.batteryStatus) }
-                    ?: "Consulta cada ~1 s; Android puede renovar algunos datos con menos frecuencia",
+                value = when {
+                    reading == null -> "Esperando lectura"
+                    pluggedSource == null -> "No disponible"
+                    else -> describePowerSource(pluggedSource)
+                },
+                supportingText = when {
+                    reading == null -> "Consulta cada ~1 s; Android puede renovar algunos datos con menos frecuencia"
+                    batteryStatus == null -> "Estado de batería no disponible"
+                    else -> describeBatteryState(batteryStatus)
+                },
                 showValueBold = false,
             )
         }
@@ -785,9 +793,11 @@ private fun PowerEstimateCard(
 @Composable
 private fun UsbDataResultCard(check: UsbDataCheck?) {
     val pluggedSource = check?.pluggedSource ?: 0
+    val deviceCount = check?.deviceCount
+    val count = deviceCount?.valueOrNull
     val title = when {
         check == null -> "Comprobación USB no disponible"
-        check.deviceCount == null -> "No se pudo consultar USB"
+        count == null -> "No se pudo consultar USB"
         check.hasDataDevice -> "Dispositivo USB de datos detectado"
         pluggedSource == BatteryManager.BATTERY_PLUGGED_WIRELESS -> "Carga inalámbrica detectada"
         pluggedSource != 0 -> "No se detectó transferencia de datos"
@@ -795,8 +805,9 @@ private fun UsbDataResultCard(check: UsbDataCheck?) {
     }
     val detail = when {
         check == null -> "No se completó la consulta con UsbManager."
-        check.deviceCount == null -> "UsbManager.getDeviceList() no devolvió una lista disponible."
-        check.hasDataDevice -> "UsbManager.getDeviceList() enumeró ${check.deviceCount} periférico(s). Hay comunicación USB en modo host."
+        deviceCount is DeviceReading.Failed -> "UsbManager no pudo enumerar los dispositivos USB."
+        count == null -> "UsbManager.getDeviceList() no devolvió una lista disponible."
+        check.hasDataDevice -> "UsbManager.getDeviceList() enumeró $count periférico(s). Hay comunicación USB en modo host."
         pluggedSource == BatteryManager.BATTERY_PLUGGED_WIRELESS -> "No aplica una prueba de cable mientras la carga es inalámbrica."
         pluggedSource != 0 -> "Parece una conexión de solo carga, pero no es concluyente: getDeviceList() enumera periféricos en modo host, no siempre el teléfono conectado a un PC. Prueba Transferencia de archivos (MTP)."
         else -> "Conecta el teléfono a una computadora y selecciona Transferencia de archivos (MTP) para probar el cable."
@@ -973,69 +984,6 @@ private fun PrivacyAndSafetyNote(module: DeviceModule) {
             )
         }
     }
-}
-
-private fun readBatteryReading(context: Context): BatteryReading {
-    val batteryIntent = context.registerReceiver(
-        null,
-        IntentFilter(Intent.ACTION_BATTERY_CHANGED),
-    ) ?: error("Battery status is unavailable")
-
-    val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
-    val rawCurrentUa = batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
-    val currentUa = rawCurrentUa
-        ?.takeUnless { it == Int.MIN_VALUE }
-        ?.toLong()
-
-    return BatteryReading(
-        voltageMv = batteryIntent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1).takeIf { it > 0 },
-        temperatureTenthsC = batteryIntent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)
-            .takeIf { it >= 0 },
-        currentUa = currentUa,
-        pluggedSource = batteryIntent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0),
-        batteryStatus = batteryIntent.getIntExtra(BatteryManager.EXTRA_STATUS, -1),
-    )
-}
-
-private fun summarizeReadings(readings: List<BatteryReading>): PowerSummary {
-    val voltages = readings.mapNotNull { it.voltageMv?.toDouble() }
-    val temperatures = readings.mapNotNull { it.temperatureTenthsC?.toDouble() }
-    val currents = readings.mapNotNull { it.currentUa?.let { value -> abs(value.toDouble()) } }
-    val wiredReadings = readings.filter {
-        it.pluggedSource != 0 && it.pluggedSource != BatteryManager.BATTERY_PLUGGED_WIRELESS
-    }
-    val powers = wiredReadings.mapNotNull { reading ->
-        val voltageMv = reading.voltageMv?.toDouble()
-        val currentUa = reading.currentUa?.let { abs(it.toDouble()) }
-        if (voltageMv == null || currentUa == null || currentUa == 0.0) {
-            null
-        } else {
-            (voltageMv / 1_000.0) * (currentUa / 1_000_000.0)
-        }
-    }
-
-    return PowerSummary(
-        averageVoltageMv = if (voltages.isNotEmpty()) voltages.average() else null,
-        averageTemperatureTenthsC = if (temperatures.isNotEmpty()) temperatures.average() else null,
-        averageCurrentMagnitudeUa = if (currents.isNotEmpty()) currents.average() else null,
-        estimatedPowerW = if (powers.isNotEmpty()) powers.average() else null,
-        sampleCount = readings.size,
-        wiredChargeSamples = wiredReadings.size,
-        wirelessChargeDetected = readings.any {
-            it.pluggedSource == BatteryManager.BATTERY_PLUGGED_WIRELESS
-        },
-    )
-}
-
-private fun inspectUsbData(context: Context, pluggedSource: Int): UsbDataCheck {
-    val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager
-        ?: return UsbDataCheck(deviceCount = null, pluggedSource = pluggedSource)
-    val deviceCount = try {
-        usbManager.getDeviceList().size
-    } catch (_: Exception) {
-        return UsbDataCheck(deviceCount = null, pluggedSource = pluggedSource)
-    }
-    return UsbDataCheck(deviceCount = deviceCount, pluggedSource = pluggedSource)
 }
 
 private fun describePowerSource(source: Int): String = when (source) {

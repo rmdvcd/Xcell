@@ -1,12 +1,6 @@
 package com.devicescope.app.ui.screens
 
-import android.content.Context
-import android.os.Build
-import android.os.Environment
-import android.os.StatFs
 import android.os.SystemClock
-import android.os.storage.StorageManager
-import android.os.storage.StorageVolume
 import android.text.format.Formatter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -49,7 +43,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.devicescope.app.data.DeviceReading
 import com.devicescope.app.data.ModuleStatus
+import com.devicescope.app.data.RemovableVolume
+import com.devicescope.app.data.StorageDiagnosticReader
 import com.devicescope.app.ui.components.StatusPill
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -61,16 +58,6 @@ import java.io.FileOutputStream
 import java.io.IOException
 
 private const val SPEED_TEST_BYTES = 5_000_000
-
-private data class RemovableVolume(
-    val id: String,
-    val label: String,
-    val state: String,
-    val totalBytes: Long?,
-    val availableBytes: Long?,
-    val appDirectory: File?,
-    val writable: Boolean,
-)
 
 private data class SdSpeedResult(
     val writeMbPerSecond: Double,
@@ -84,6 +71,7 @@ internal fun ColumnScope.SdCardDiagnosticContent() {
     val scope = rememberCoroutineScope()
     var volumes by remember { mutableStateOf<List<RemovableVolume>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf<String?>(null) }
     var refreshKey by remember { mutableStateOf(0) }
     var testingVolumeId by remember { mutableStateOf<String?>(null) }
     var speedResults by remember { mutableStateOf<Map<String, SdSpeedResult>>(emptyMap()) }
@@ -91,7 +79,27 @@ internal fun ColumnScope.SdCardDiagnosticContent() {
 
     LaunchedEffect(refreshKey) {
         isLoading = true
-        volumes = withContext(Dispatchers.IO) { findRemovableVolumes(context) }
+        loadError = null
+        when (val result = withContext(Dispatchers.IO) {
+            StorageDiagnosticReader.readRemovableVolumes(context)
+        }) {
+            is DeviceReading.Available -> {
+                volumes = result.value
+                loadError = null
+            }
+            DeviceReading.NotAvailable -> {
+                volumes = emptyList()
+                loadError = "El servicio de almacenamiento no está disponible en este dispositivo."
+            }
+            is DeviceReading.Failed -> {
+                volumes = emptyList()
+                loadError = if (result.error is SecurityException) {
+                    "Android no autorizó la consulta de almacenamiento."
+                } else {
+                    "No se pudieron consultar los volúmenes extraíbles."
+                }
+            }
+        }
         isLoading = false
     }
 
@@ -162,6 +170,15 @@ internal fun ColumnScope.SdCardDiagnosticContent() {
         }
         Spacer(Modifier.height(8.dp))
 
+        loadError?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+
         if (isLoading && volumes.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -172,7 +189,7 @@ internal fun ColumnScope.SdCardDiagnosticContent() {
                 CircularProgressIndicator()
             }
         } else if (volumes.isEmpty()) {
-            EmptyStorageCard()
+            if (loadError == null) EmptyStorageCard()
         } else {
             volumes.forEach { volume ->
                 RemovableVolumeCard(
@@ -391,63 +408,6 @@ private fun VolumeSpaceRow(label: String, bytes: Long?) {
             fontWeight = FontWeight.SemiBold,
         )
     }
-}
-
-private fun findRemovableVolumes(context: Context): List<RemovableVolume> {
-    val storageManager = context.getSystemService(Context.STORAGE_SERVICE) as? StorageManager ?: return emptyList()
-    val externalFilesDirs = context.getExternalFilesDirs(null)
-    val removable = storageManager.getStorageVolumes().filter { it.isRemovable }
-
-    return removable.mapIndexed { index, volume ->
-        val description = runCatching { volume.getDescription(context) }.getOrNull().orEmpty()
-        val label = description.ifBlank { "Almacenamiento extraíble ${index + 1}" }
-        val state = runCatching { volume.state }.getOrNull().orEmpty()
-        val appDirectory = findAppDirectory(volume, externalFilesDirs, index)
-        val mounted = state == Environment.MEDIA_MOUNTED || state == Environment.MEDIA_MOUNTED_READ_ONLY
-        if (mounted && appDirectory != null && !appDirectory.exists()) {
-            appDirectory.mkdirs()
-        }
-        val statPath = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            runCatching { volume.directory?.absolutePath }.getOrNull()
-        } else {
-            null
-        } ?: appDirectory?.absolutePath
-        val stat = if (mounted && statPath != null) {
-            runCatching { StatFs(statPath) }.getOrNull()
-        } else {
-            null
-        }
-        val id = volume.uuid?.takeIf(String::isNotBlank) ?: "${label}_$index"
-        RemovableVolume(
-            id = id,
-            label = label,
-            state = state,
-            totalBytes = stat?.totalBytes,
-            availableBytes = stat?.availableBytes,
-            appDirectory = appDirectory,
-            writable = mounted && state == Environment.MEDIA_MOUNTED && appDirectory?.canWrite() == true,
-        )
-    }
-}
-
-private fun findAppDirectory(
-    volume: StorageVolume,
-    externalFilesDirs: Array<File?>,
-    removableIndex: Int,
-): File? {
-    val directories = externalFilesDirs.filterNotNull()
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        val rootPath = runCatching { volume.directory?.canonicalPath }.getOrNull()
-        val pathMatch = directories.firstOrNull { directory ->
-            rootPath != null && runCatching { directory.canonicalPath.startsWith(rootPath) }.getOrDefault(false)
-        }
-        if (pathMatch != null) return pathMatch
-    }
-    val uuid = volume.uuid?.takeIf(String::isNotBlank)
-    if (uuid != null) {
-        directories.firstOrNull { it.absolutePath.contains(uuid, ignoreCase = true) }?.let { return it }
-    }
-    return externalFilesDirs.getOrNull(removableIndex + 1)
 }
 
 private fun runSdSpeedTest(directory: File): SdSpeedResult {

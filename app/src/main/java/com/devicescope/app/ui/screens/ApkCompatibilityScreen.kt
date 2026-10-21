@@ -1,5 +1,6 @@
 package com.devicescope.app.ui.screens
 
+import android.content.Context
 import android.net.Uri
 import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -60,7 +61,9 @@ import java.io.IOException
 private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
 
 @Composable
-internal fun ColumnScope.ApkCompatibilityContent() {
+internal fun ColumnScope.ApkCompatibilityContent(
+    analyzeApk: (Context, Uri) -> ApkCompatibilityReport = ApkCompatibilityAnalyzer::analyze,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var report by remember { mutableStateOf<ApkCompatibilityReport?>(null) }
@@ -80,7 +83,7 @@ internal fun ColumnScope.ApkCompatibilityContent() {
             scope.launch {
                 try {
                     report = withContext(Dispatchers.IO) {
-                        ApkCompatibilityAnalyzer.analyze(context.applicationContext, uri)
+                        analyzeApk(context.applicationContext, uri)
                     }
                 } catch (exception: Exception) {
                     analysisError = exception.localizedMessage

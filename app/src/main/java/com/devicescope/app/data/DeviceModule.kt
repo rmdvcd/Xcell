@@ -104,7 +104,7 @@ val deviceModules = listOf(
             "Revisa Wi-Fi y Bluetooth desde Ajustes rápidos o Configuración.",
             "Si una conexión falla, desactívala y vuelve a activarla desde el sistema.",
         ),
-        privacyNote = "No se escanean redes ni se leen coordenadas. Android 13+ usa Dispositivos cercanos y versiones anteriores pueden requerir Ubicación precisa para revelar SSID/señal; no se consultan coordenadas. Bluetooth Connect solo se usa para consultar su estado.",
+        privacyNote = "No se escanean redes ni se leen coordenadas. El SSID se muestra solo en Android 13+ con el permiso opcional Dispositivos cercanos; la app no declara ni solicita permiso de ubicación. Bluetooth Connect solo se usa para consultar su estado.",
     ),
     DeviceModule(
         id = ModuleIds.APP_COMPATIBILITY,

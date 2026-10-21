@@ -1,20 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- No INTERNET permission: all checks and screens work locally on-device. -->
+    <!-- Runtime permission used only for SIM operator/country/signal. SIM state and
+         the rest of the screen work when it is denied. No ICCID, IMSI or phone
+         number is read. -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission
-        android:name="android.permission.ACCESS_FINE_LOCATION"
-        android:maxSdkVersion="32" />
+    <!-- Runtime permission for the connected Wi-Fi SSID on Android 13+. The app
+         never derives location from Wi-Fi, hence neverForLocation. -->
     <uses-permission
         android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation" />
+    <!-- Legacy Bluetooth (API <= 30). Android 12+ uses BLUETOOTH_CONNECT below. -->
     <uses-permission
         android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
+    <!-- Runtime permission on Android 12+ (API 31+); no maxSdkVersion because it
+         remains required on newer versions. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.NFC" />
+    <!-- No storage permissions: the SD check only reads StatFs and writes a
+         temporary file in the app-specific external directory. -->
+    <!-- No location permission: the app neither scans networks nor reads GPS
+         coordinates; it only checks whether the GPS provider is enabled. -->
 
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
     <uses-feature android:name="android.hardware.wifi" android:required="false" />
