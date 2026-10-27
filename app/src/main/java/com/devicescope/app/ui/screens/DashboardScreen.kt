@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,7 +23,9 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -33,22 +34,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.devicescope.app.data.DeviceModule
+import com.devicescope.app.data.FullDiagnosticReport
 import com.devicescope.app.data.deviceModules
-import com.devicescope.app.ui.components.HealthScoreRing
 import com.devicescope.app.ui.components.StatusPill
+import com.devicescope.app.ui.components.statusLabel
 import java.text.DateFormat
 import java.util.Date
 
@@ -56,9 +54,8 @@ import java.util.Date
 fun DashboardScreen(
     darkTheme: Boolean,
     onToggleTheme: () -> Unit,
-    healthScore: Int,
-    lastCheckedAtMillis: Long?,
-    onOpenModule: (DeviceModule) -> Unit,
+    lastReport: FullDiagnosticReport?,
+    onOpenDiagnostic: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -75,27 +72,23 @@ fun DashboardScreen(
                 .padding(horizontal = 20.dp),
         ) {
             Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+            Row(verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Tu dispositivo,",
+                        text = "Todo el teléfono,",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
-                        text = "bajo control.",
+                        text = "bajo la lupa.",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = "Una revisión clara, sin salir de tu móvil.",
+                        text = "Un único diagnóstico para cada componente, sin salir del dispositivo.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -103,51 +96,92 @@ fun DashboardScreen(
                 OfflineBadge()
             }
 
-            Spacer(Modifier.height(22.dp))
-            HealthScoreCard(
-                score = healthScore,
-                lastCheckedAtMillis = lastCheckedAtMillis,
-            )
+            Spacer(Modifier.height(20.dp))
+            LastReportCard(lastReport = lastReport)
 
-            Spacer(Modifier.height(26.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Spacer(Modifier.height(24.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Módulos de revisión",
+                    text = "Módulo de diagnóstico",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.weight(1f))
                 Text(
-                    text = "6 módulos",
+                    text = "${deviceModules.size} módulo",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Spacer(Modifier.height(12.dp))
 
-            deviceModules.chunked(2).forEach { rowModules ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    rowModules.forEach { module ->
-                        ModuleTile(
-                            module = module,
-                            modifier = Modifier.weight(1f),
-                            onClick = { onOpenModule(module) },
+            val module = deviceModules.single()
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("dashboard-module-card")
+                    .clickable(role = Role.Button, onClick = onOpenDiagnostic),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = RoundedCornerShape(16.dp),
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = module.icon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = module.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = module.summary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Filled.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    if (rowModules.size == 1) {
-                        Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = module.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Button(onClick = onOpenDiagnostic, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Iniciar diagnóstico exhaustivo")
                     }
                 }
-                Spacer(Modifier.height(12.dp))
             }
 
+            Spacer(Modifier.height(18.dp))
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -165,13 +199,64 @@ fun DashboardScreen(
                         modifier = Modifier.size(20.dp),
                     )
                     Text(
-                        text = "Tus datos permanecen en este dispositivo. Las advertencias señalan revisiones manuales, no averías confirmadas.",
+                        text = module.privacyNote,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun LastReportCard(lastReport: FullDiagnosticReport?) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = RoundedCornerShape(26.dp),
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "ÚLTIMO DIAGNÓSTICO",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f),
+                    modifier = Modifier.weight(1f),
+                )
+                if (lastReport != null) {
+                    StatusPill(label = statusLabel(lastReport.overall), status = lastReport.overall)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            if (lastReport == null) {
+                Text(
+                    text = "Sin ejecutar",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    text = "Entra al módulo y analiza las 14 secciones del equipo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
+                )
+            } else {
+                val counts = lastReport.counts()
+                Text(
+                    text = "${lastReport.sections.size} secciones · ${counts.first} errores · ${counts.second} advertencias",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    text = "Generado ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(Date(lastReport.generatedAtMillis))}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
+                )
+            }
         }
     }
 }
@@ -205,12 +290,12 @@ private fun DashboardTopBar(
             Icon(
                 imageVector = Icons.Filled.Shield,
                 contentDescription = null,
-                tint = if (darkTheme) MaterialTheme.colorScheme.onPrimary else Color.White,
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(23.dp),
             )
         }
         Spacer(Modifier.width(10.dp))
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "DeviceScope",
                 style = MaterialTheme.typography.titleMedium,
@@ -220,11 +305,9 @@ private fun DashboardTopBar(
             Text(
                 text = "DIAGNÓSTICO LOCAL",
                 style = MaterialTheme.typography.labelSmall,
-                letterSpacing = 0.7.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(Modifier.weight(1f))
         IconButton(
             onClick = onToggleTheme,
             modifier = Modifier
@@ -248,155 +331,11 @@ private fun OfflineBadge() {
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         shape = CircleShape,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .background(MaterialTheme.colorScheme.secondary, CircleShape),
-            )
-            Text(
-                text = "OFFLINE",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.35.sp,
-            )
-        }
-    }
-}
-
-@Composable
-private fun HealthScoreCard(
-    score: Int,
-    lastCheckedAtMillis: Long?,
-) {
-    val updateLabel = remember(lastCheckedAtMillis) {
-        lastCheckedAtMillis?.let {
-            "Última revisión · ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it))}"
-        } ?: "Puntuación orientativa · ejecuta el diagnóstico para actualizar"
-    }
-    val heading = when {
-        score >= 90 -> "Excelente estado"
-        score >= 75 -> "Buen estado"
-        score >= 55 -> "Conviene revisar"
-        else -> "Necesita atención"
-    }
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    text = "SALUD DEL DISPOSITIVO",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f),
-                    letterSpacing = 0.8.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(9.dp))
-                Text(
-                    text = heading,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontWeight = FontWeight.Bold,
-                )
-                Spacer(Modifier.height(5.dp))
-                Text(
-                    text = "Índice local orientativo, de 0 a 100.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
-                )
-                Spacer(Modifier.height(13.dp))
-                Text(
-                    text = updateLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f),
-                    maxLines = 2,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            HealthScoreRing(score = score, size = 104.dp)
-        }
-    }
-}
-
-@Composable
-private fun ModuleTile(
-    module: DeviceModule,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Card(
-        modifier = modifier
-            .testTag("dashboard-module-card")
-            .heightIn(min = 188.dp)
-            .clickable(role = Role.Button, onClick = onClick),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = RoundedCornerShape(13.dp),
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = module.icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(21.dp),
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-                Icon(
-                    imageVector = Icons.Filled.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = module.title,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold,
-                lineHeight = MaterialTheme.typography.titleSmall.lineHeight,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = module.summary,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(9.dp))
-            StatusPill(status = module.status)
-        }
+        Text(
+            text = "OFFLINE",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+        )
     }
 }

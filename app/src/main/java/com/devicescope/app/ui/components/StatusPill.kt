@@ -16,21 +16,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.devicescope.app.data.ModuleStatus
+import com.devicescope.app.data.DiagnosticStatus
 
 @Composable
 fun StatusPill(
-    status: ModuleStatus,
+    label: String,
+    status: DiagnosticStatus,
     modifier: Modifier = Modifier,
-    label: String = status.label,
 ) {
     val (containerColor, contentColor) = when (status) {
-        ModuleStatus.OK -> MaterialTheme.colorScheme.secondaryContainer to
+        DiagnosticStatus.OK -> MaterialTheme.colorScheme.secondaryContainer to
             MaterialTheme.colorScheme.onSecondaryContainer
-        ModuleStatus.WARNING -> MaterialTheme.colorScheme.tertiaryContainer to
+        DiagnosticStatus.WARNING -> MaterialTheme.colorScheme.tertiaryContainer to
             MaterialTheme.colorScheme.onTertiaryContainer
-        ModuleStatus.ERROR -> MaterialTheme.colorScheme.errorContainer to
+        DiagnosticStatus.ERROR -> MaterialTheme.colorScheme.errorContainer to
             MaterialTheme.colorScheme.onErrorContainer
+        DiagnosticStatus.UNKNOWN -> MaterialTheme.colorScheme.surfaceVariant to
+            MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     Surface(

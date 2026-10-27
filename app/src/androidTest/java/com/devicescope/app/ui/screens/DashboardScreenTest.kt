@@ -15,20 +15,20 @@ class DashboardScreenTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun dashboardShowsSixModuleCards() {
+    fun dashboardShowsOnlyTheSingleDiagnosticModule() {
         composeRule.setContent {
             DeviceScopeTheme(darkTheme = false) {
                 DashboardScreen(
                     darkTheme = false,
                     onToggleTheme = {},
-                    healthScore = 90,
-                    lastCheckedAtMillis = null,
-                    onOpenModule = {},
+                    lastReport = null,
+                    onOpenDiagnostic = {},
                 )
             }
         }
 
-        composeRule.onNodeWithText("6 módulos").assertIsDisplayed()
-        composeRule.onAllNodesWithTag("dashboard-module-card").assertCountEquals(6)
+        composeRule.onNodeWithText("1 módulo").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("dashboard-module-card").assertCountEquals(1)
+        composeRule.onNodeWithText("Iniciar diagnóstico exhaustivo").assertIsDisplayed()
     }
 }
