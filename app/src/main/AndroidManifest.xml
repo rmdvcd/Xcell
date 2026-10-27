@@ -1,37 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- No INTERNET permission: all checks and screens work locally on-device. -->
-    <!-- Runtime permission used only for SIM operator/country/signal. SIM state and
-         the rest of the screen work when it is denied. No ICCID, IMSI or phone
-         number is read. -->
+    <!-- Sin permiso INTERNET: el diagnóstico completo funciona sin conexión. -->
+    <!-- Permisos de red y radio (solo lectura de estado). -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <!-- Runtime permission for the connected Wi-Fi SSID on Android 13+. The app
-         never derives location from Wi-Fi, hence neverForLocation. -->
+    <!-- SSID de la red conectada en Android 13+; nunca se usa para ubicación. -->
     <uses-permission
         android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation" />
-    <!-- Legacy Bluetooth (API <= 30). Android 12+ uses BLUETOOTH_CONNECT below. -->
+    <!-- Bluetooth: legacy en API <= 30 y runtime en API 31+. -->
     <uses-permission
         android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
-    <!-- Runtime permission on Android 12+ (API 31+); no maxSdkVersion because it
-         remains required on newer versions. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.NFC" />
-    <!-- No storage permissions: the SD check only reads StatFs and writes a
-         temporary file in the app-specific external directory. -->
-    <!-- No location permission: the app neither scans networks nor reads GPS
-         coordinates; it only checks whether the GPS provider is enabled. -->
+    <!-- Grabación de 2 s para medir el micrófono. El audio no se guarda. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Sin permisos de ubicación, cámara, contactos, SMS ni almacenamiento
+         general. No se escanean redes, no se leen coordenadas, ICCID, IMSI
+         ni número telefónico. Los informes se exportan con el selector del
+         sistema; la app nunca abre sockets ni hace peticiones de red. -->
 
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
     <uses-feature android:name="android.hardware.wifi" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
