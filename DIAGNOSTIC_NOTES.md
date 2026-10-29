@@ -49,8 +49,14 @@ Por tanto, el "mapa de voltajes" es un mapa de **batería, cargador, BMS, regula
 
 ## 4. Privacidad
 
-- Sin `INTERNET`. Ninguna clase abre sockets, usa `HttpURLConnection` ni llama a servicios en la nube.
-- Sin `ACCESS_COARSE_LOCATION` / `ACCESS_FINE_LOCATION`. No se llama a `WifiManager.getScanResults()` ni a `TelephonyManager.getAllCellInfo()` (requieren ubicación).
+- **El diagnóstico no usa la red.** Ninguna clase del diagnóstico abre sockets,
+  usa `HttpURLConnection` ni llama a servicios en la nube. El permiso `INTERNET`
+  del manifiesto pertenece al módulo PC-Móvil (enlace directo con el agente en la
+  LAN); ese módulo tiene su propio documento en [`docs/PC-MOVIL.md`](docs/PC-MOVIL.md).
+- El diagnóstico no usa `ACCESS_COARSE_LOCATION` / `ACCESS_FINE_LOCATION` ni llama
+  a `WifiManager.getScanResults()` o `TelephonyManager.getAllCellInfo()`. El
+  único escaneo de radiofrecuencia está aislado en el A-D Scanner del módulo
+  PC-Móvil, se activa a mano y nunca lee coordenadas.
 - No se consulta ICCID, IMSI, número de teléfono ni lista de contactos. `Build.getSerial()` solo se lee si `READ_PHONE_STATE` está concedido.
 - `getprop`, `build.prop` y `/proc` se vuelcan **dentro del informe local**; el usuario decide si lo guarda. La app no los transmite.
 - `allowBackup=false` para que el informe y los permisos no se copien a otro equipo sin control.

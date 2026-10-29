@@ -18,10 +18,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.devicescope.app.data.FullDiagnosticReport
+import com.devicescope.app.data.ModuleIds
 import com.devicescope.app.ui.screens.DashboardScreen
 import com.devicescope.app.ui.screens.FullDiagnosticScreen
 import com.devicescope.app.ui.theme.DeviceScopeTheme
@@ -77,7 +79,12 @@ private fun DeviceScopeContent(
                     darkTheme = darkTheme,
                     onToggleTheme = onToggleTheme,
                     lastReport = lastReport,
-                    onOpenDiagnostic = { navController.navigate(Routes.FULL_DIAGNOSTIC) },
+                    onOpenModule = { moduleId ->
+                        when (moduleId) {
+                            ModuleIds.FULL_DIAGNOSTIC -> navController.navigate(Routes.FULL_DIAGNOSTIC)
+                            ModuleIds.PC_MOVIL -> navController.navigate(PcRoutes.PANEL)
+                        }
+                    },
                 )
             }
             composable(Routes.FULL_DIAGNOSTIC) {
@@ -86,6 +93,62 @@ private fun DeviceScopeContent(
                     onReportReady = { lastReport = it },
                 )
             }
+            composable(PcRoutes.PANEL) {
+                PcMovilScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenTool = { route -> navController.navigate(route) },
+                )
+            }
+            composable(PcRoutes.KEYBOARD) {
+                PcKeyboardToolScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPanel = { navController.backToPcPanel() },
+                )
+            }
+            composable(PcRoutes.MOUSE) {
+                PcMouseToolScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPanel = { navController.backToPcPanel() },
+                )
+            }
+            composable(PcRoutes.CAMERA) {
+                PcCameraToolScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPanel = { navController.backToPcPanel() },
+                )
+            }
+            composable(PcRoutes.AUDIO) {
+                PcAudioToolScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPanel = { navController.backToPcPanel() },
+                )
+            }
+            composable(PcRoutes.TRANSFER) {
+                PcTransferToolScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPanel = { navController.backToPcPanel() },
+                )
+            }
+            composable(PcRoutes.VPN) {
+                PcVpnToolScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPanel = { navController.backToPcPanel() },
+                )
+            }
+            composable(PcRoutes.RESOURCES) {
+                PcResourcesToolScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenPanel = { navController.backToPcPanel() },
+                )
+            }
+            composable(PcRoutes.SCANNER) {
+                PcScannerToolScreen(onBack = { navController.popBackStack() })
+            }
         }
     }
+}
+
+/** Vuelve al panel del módulo sin apilar pantallas. */
+private fun NavHostController.backToPcPanel() {
+    popBackStack(PcRoutes.PANEL, inclusive = false)
 }

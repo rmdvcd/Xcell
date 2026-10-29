@@ -15,20 +15,21 @@ class DashboardScreenTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun dashboardShowsOnlyTheSingleDiagnosticModule() {
+    fun dashboardShowsBothModules() {
         composeRule.setContent {
             DeviceScopeTheme(darkTheme = false) {
                 DashboardScreen(
                     darkTheme = false,
                     onToggleTheme = {},
                     lastReport = null,
-                    onOpenDiagnostic = {},
+                    onOpenModule = {},
                 )
             }
         }
 
-        composeRule.onNodeWithText("1 módulo").assertIsDisplayed()
-        composeRule.onAllNodesWithTag("dashboard-module-card").assertCountEquals(1)
+        composeRule.onNodeWithText("2 módulos").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("dashboard-module-card").assertCountEquals(2)
         composeRule.onNodeWithText("Iniciar diagnóstico exhaustivo").assertIsDisplayed()
+        composeRule.onNodeWithText("Abrir PC-Móvil").assertIsDisplayed()
     }
 }

@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">DeviceScope</string>
+    <string name="pc_input_service_label">DeviceScope PC-Móvil</string>
+    <string name="pc_input_service_description">Permite que la PC emparejada escriba texto y envíe toques al teléfono por la red local. Solo se activa cuando tú lo habilitas y la sesión está emparejada con PIN.</string>
 </resources>
