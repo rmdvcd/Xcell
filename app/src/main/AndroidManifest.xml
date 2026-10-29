@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Sin permiso INTERNET: el diagnóstico completo funciona sin conexión. -->
-    <!-- Permisos de red y radio (solo lectura de estado). -->
+    <!-- El diagnóstico exhaustivo sigue siendo offline. El permiso INTERNET existe
+         solo para el módulo PC-Móvil (sockets TCP/UDP hacia el agente en la LAN):
+         no hay nube, ni cuentas, ni telemetría. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Descubrimiento por broadcast UDP y escucha de anuncios en la LAN. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+
+    <!-- Permisos de red y radio (solo lectura de estado en el diagnóstico). -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -13,22 +19,43 @@
     <uses-permission
         android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.NFC" />
-    <!-- Grabación de 2 s para medir el micrófono. El audio no se guarda. -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- Sin permisos de ubicación, cámara, contactos, SMS ni almacenamiento
-         general. No se escanean redes, no se leen coordenadas, ICCID, IMSI
-         ni número telefónico. Los informes se exportan con el selector del
-         sistema; la app nunca abre sockets ni hace peticiones de red. -->
+    <!-- Grabación para la prueba de 2 s del diagnóstico y para el micrófono remoto.
+         El audio nunca se guarda. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Cámara del teléfono como webcam del módulo PC-Móvil. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- A-D Scanner: WiFi y celdas exigen ubicación en Android 12 y anteriores.
+         Solo se piden cuando el usuario enciende el barrido y NUNCA se leen
+         coordenadas. Desde Android 13 el escaneo WiFi usa NEARBY_WIFI_DEVICES
+         con neverForLocation. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- El servicio de accesibilidad se activa a mano en Ajustes y solo se usa para
+         inyectar la entrada que llega de la PC emparejada. -->
+    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
 
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
     <uses-feature android:name="android.hardware.wifi" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi.direct" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
         android:allowBackup="false"
@@ -40,11 +67,41 @@
         android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- VPN hacia la red de la PC. El sistema pide consentimiento con
+             VpnService.prepare() y muestra su propio indicador de VPN. -->
+        <service
+            android:name=".pcmovil.link.PcVpnService"
+            android:exported="false"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON"
+                android:value="false" />
+        </service>
+
+        <!-- Recibe teclado/mouse de la PC emparejada. Desactivado por defecto:
+             el usuario lo habilita en Ajustes → Accesibilidad. -->
+        <service
+            android:name=".pcmovil.link.PcRemoteInputService"
+            android:exported="true"
+            android:label="@string/pc_input_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/pc_input_service" />
+        </service>
     </application>
 </manifest>

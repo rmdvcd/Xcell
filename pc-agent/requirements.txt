@@ -1,0 +1,20 @@
+# DeviceScope · agente PC-Móvil
+#
+# Todo es opcional: `python agent.py` arranca solo con la biblioteca estándar y
+# anuncia por `hello` las capacidades que realmente tiene. Instala lo que quieras
+# habilitar. Ver README.md para la tabla completa y las alternativas por sistema.
+#
+#   python -m pip install -r requirements.txt
+
+# Métricas completas de la PC (CPU, RAM, swap, discos, red, procesos, batería).
+psutil>=5.9
+
+# Espejo de pantalla y ventana de vista previa de la cámara del móvil.
+pillow>=10.0
+mss>=9.0
+
+# Inyección de teclado/mouse y captura de la entrada local (PC → móvil).
+pynput>=1.7
+
+# Micrófono del móvil hacia la PC y audio de la PC hacia el teléfono.
+sounddevice>=0.4

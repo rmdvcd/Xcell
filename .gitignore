@@ -10,3 +10,12 @@ local.properties
 # Native build outputs
 .cxx/
 .externalNativeBuild/
+
+# Python (agente PC-Móvil)
+__pycache__/
+*.py[cod]
+.venv/
+pc-agent/.devicescope/
+
+# Artefactos locales del agente
+*.log
