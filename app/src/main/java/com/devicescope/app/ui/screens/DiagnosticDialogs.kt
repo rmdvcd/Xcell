@@ -61,7 +61,6 @@ import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.log10
-import kotlin.math.maxOf
 import kotlin.math.round
 import kotlin.math.sin
 import kotlin.math.sqrt

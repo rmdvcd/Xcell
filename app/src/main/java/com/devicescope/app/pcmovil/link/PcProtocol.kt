@@ -34,6 +34,7 @@ object PcProtocol {
         const val PAIR = "pair"
         const val PAIR_OK = "pair_ok"
         const val PAIR_FAIL = "pair_fail"
+        const val PAIR_REQUIRED = "pair_required"
         const val PING = "ping"
         const val PONG = "pong"
         const val ERROR = "error"

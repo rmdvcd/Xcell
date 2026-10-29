@@ -119,10 +119,10 @@ fun PcMovilScreen(
         onBack = onBack,
         actions = {
             if (state is PcLinkState.Connected) {
-                PcTextButton(text = "Desconectar") {
+                PcTextButton(text = "Desconectar", onClick = {
                     link.disconnect()
                     refreshDevices()
-                }
+                })
             } else {
                 PcStatusChip(state = state)
             }

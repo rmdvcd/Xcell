@@ -51,6 +51,19 @@ class PcProtocolTest {
     }
 
     @Test
+    fun `reconoce solicitud de PIN del agente`() {
+        val envelope = PcProtocol.decode(
+            """{"v":1,"type":"pair_required","id":1,"data":{"agent":{"name":"Mi PC"},"attempts_left":3,"message":"Escribe el PIN"}}""",
+        )
+        requireNotNull(envelope)
+        assertEquals(PcProtocol.Type.PAIR_REQUIRED, envelope.type)
+        assertEquals(1L, envelope.id)
+        assertEquals("Mi PC", envelope.map("agent")["name"])
+        assertEquals(3, envelope.int("attempts_left"))
+        assertEquals("Escribe el PIN", envelope.string("message"))
+    }
+
+    @Test
     fun `metodos tolerantes del envelope`() {
         val envelope = PcProtocol.decode(
             """{"v":1,"type":"pair_fail","data":{"reason":"PIN incorrecto","attempts_left":2,"ok":"true","flag":1}}""",

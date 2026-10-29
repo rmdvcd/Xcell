@@ -176,6 +176,7 @@ class PcLinkManager private constructor(context: Context) {
                     PcProtocol.Type.HELLO_ACK,
                     PcProtocol.Type.PAIR_OK,
                     PcProtocol.Type.PAIR_FAIL,
+                    PcProtocol.Type.PAIR_REQUIRED,
                 ),
             )
             finishHandshake(handshake, device)
@@ -230,11 +231,12 @@ class PcLinkManager private constructor(context: Context) {
     }
 
     private fun finishHandshake(response: PcEnvelope, device: PcDevice): Result<PcAgentInfo> {
-        if (response.type == PcProtocol.Type.PAIR_FAIL) {
-            val reason = response.string("reason") ?: "Emparejamiento rechazado"
+        if (response.type == PcProtocol.Type.PAIR_REQUIRED || response.type == PcProtocol.Type.PAIR_FAIL) {
+            val reason = response.string("reason") ?: response.string("message")
+                ?: "Escribe el PIN que muestra el agente en la PC"
             _state.value = PcLinkState.PairingRequired(
                 endpoint = device.endpoint,
-                deviceName = device.name,
+                deviceName = response.map("agent")["name"]?.toString() ?: device.name,
                 attemptsLeft = (response.data["attempts_left"] as? Number)?.toInt(),
                 message = reason,
             )

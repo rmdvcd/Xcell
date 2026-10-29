@@ -35,7 +35,8 @@ private object Routes {
 
 @Composable
 fun DeviceScopeApp() {
-    var darkTheme by rememberSaveable { mutableStateOf(isSystemInDarkTheme()) }
+    val systemDarkTheme = isSystemInDarkTheme()
+    var darkTheme by rememberSaveable { mutableStateOf(systemDarkTheme) }
     DeviceScopeTheme(darkTheme = darkTheme) {
         DeviceScopeContent(
             darkTheme = darkTheme,
