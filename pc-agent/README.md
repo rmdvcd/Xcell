@@ -96,6 +96,7 @@ sudo modprobe v4l2loopback exclusive_caps=1 card_label="Teléfono"
 
 ## Seguridad
 
+* La rueda se interpreta en pasos (`unit:"steps"`), no en píxeles.
 * El PIN se compara en tiempo constante y bloquea 60 s tras 5 fallos.
 * El token de 24 bytes se genera en el emparejamiento y se puede revocar.
 * Una sola sesión activa; una segunda conexión emparejada recibe un error claro.

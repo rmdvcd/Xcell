@@ -77,6 +77,23 @@ ordinales 0–7, así que no hay ambigüedad.
 | speaker | 6 | PCM16 de la PC |
 | files | 7 | bloques de archivo + marcador de fin |
 
+### Contrato de los mensajes delicados
+
+Tres detalles que **deben** coincidir con `pc-agent/devicescope_agent/protocol.py`
+y `server.py`; si cambias uno, cambia también las pruebas de ambos lados.
+
+* **Fin de subida (`files`)**: el último frame del canal es un
+  `KIND_CONTROL` con JSON **sin envoltorio** `{"end":true,"name":…,"size":…}`.
+  El agente responde `file_end` (o `file_error`) y la app espera esa respuesta
+  con 20 s de margen; no da la subida por buena solo por haber escrito.
+* **Rueda (`scroll`)**: el touchpad acumula el arrastre y envía **pasos**
+  enteros con `{"dy":N,"unit":"steps"}` (24 px de arrastre por paso). El agente
+  también acepta `unit:"px"` y divide por 120 si algún cliente antiguo lo manda.
+* **Entrada PC → móvil**: el agente marca siempre `"target":"phone"` en `text`,
+  `key`, `gesture`, `mouse` y `scroll`; el `AccessibilityService` ignora lo que
+  no sea para el teléfono. `capture_start`/`capture_stop` activan y desactivan la
+  captura de teclado y mouse de la PC.
+
 ### Emparejamiento
 
 1. El teléfono envía `hello` con su huella (`DS-XXXXXXXX`), su nombre y el token
