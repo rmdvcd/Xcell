@@ -48,7 +48,7 @@ class PcRemoteInputService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        connected.value = true
+        _connected.value = true
         val link = PcLinkManager.get(this)
         collector?.cancel()
         collector = scope.launch {
@@ -66,7 +66,7 @@ class PcRemoteInputService : AccessibilityService() {
 
     override fun onDestroy() {
         collector?.cancel()
-        connected.value = false
+        _connected.value = false
         super.onDestroy()
     }
 
@@ -75,7 +75,7 @@ class PcRemoteInputService : AccessibilityService() {
             PcProtocol.Type.TEXT -> {
                 val text = envelope.string("text").orEmpty()
                 if (text.isNotEmpty()) {
-                    lastText.value = text
+                    _lastText.value = text
                     injectText(text)
                 }
             }
@@ -182,7 +182,7 @@ class PcRemoteInputService : AccessibilityService() {
         val stroke = GestureDescription.StrokeDescription(path, 0L, effectiveDuration)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
         runCatching { dispatchGesture(gesture, null, null) }
-        lastGestureAt.value = System.currentTimeMillis()
+        _lastGestureAt.value = System.currentTimeMillis()
     }
 
     private fun injectText(text: String) {
@@ -196,7 +196,7 @@ class PcRemoteInputService : AccessibilityService() {
         if (!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) {
             fallbackPaste(text)
         } else {
-            lastInjected.value = text
+            _lastInjected.value = text
         }
     }
 
@@ -204,7 +204,7 @@ class PcRemoteInputService : AccessibilityService() {
         copyToClipboard(text)
         val node = focusedEditable() ?: return
         runCatching { node.performAction(AccessibilityNodeInfo.ACTION_PASTE) }
-        lastInjected.value = text
+        _lastInjected.value = text
     }
 
     private fun pressEnter() {

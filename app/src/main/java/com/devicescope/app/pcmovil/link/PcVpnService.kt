@@ -132,7 +132,12 @@ class PcVpnService : VpnService() {
                     dropped = engine.droppedPackets,
                     flows = engine.openFlows,
                 )
-                runCatching { Thread.sleep(2_000) }.getOrElse { break }
+                try {
+                    Thread.sleep(2_000)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
+                }
             }
         }, "pc-vpn-stats").apply { isDaemon = true }.start()
     }
