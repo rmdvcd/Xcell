@@ -149,7 +149,9 @@ class PcLinkManager private constructor(context: Context) {
             val socket = Socket().apply {
                 tcpNoDelay = true
                 keepAlive = true
-                connect(InetSocketAddress(address, port), CONNECT_TIMEOUT_MS)
+                val remote = java.net.InetAddress.getByName(address)
+                PcTransport.route(remote)?.let { bind(InetSocketAddress(it.local, 0)) }
+                connect(InetSocketAddress(remote, port), CONNECT_TIMEOUT_MS)
                 soTimeout = 0
             }
             val newConnection = PcConnection(socket, scope)

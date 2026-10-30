@@ -57,6 +57,7 @@ fun DashboardScreen(
     onToggleTheme: () -> Unit,
     lastReport: FullDiagnosticReport?,
     onOpenModule: (String) -> Unit,
+    onPermissions: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -73,31 +74,6 @@ fun DashboardScreen(
                 .padding(horizontal = 20.dp),
         ) {
             Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.Top) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Todo el teléfono,",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                    Text(
-                        text = "bajo la lupa.",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = "Diagnóstico de cada componente y herramientas PC-Móvil, sin salir de tu red.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                OfflineBadge()
-            }
-
-            Spacer(Modifier.height(20.dp))
             LastReportCard(lastReport = lastReport)
 
             Spacer(Modifier.height(24.dp))
@@ -125,31 +101,7 @@ fun DashboardScreen(
                 Spacer(Modifier.height(12.dp))
             }
 
-            Spacer(Modifier.height(18.dp))
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Lock,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Text(
-                        text = "El diagnóstico funciona sin red. PC-Móvil usa solo tu red local: no hay nube, " +
-                            "ni cuentas, ni telemetría, y el audio de las pruebas nunca se guarda.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            androidx.compose.material3.TextButton(onClick = onPermissions) { Text("Permisos") }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -210,12 +162,6 @@ private fun ModuleCard(
                 )
             }
             Spacer(Modifier.height(12.dp))
-            Text(
-                text = module.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(14.dp))
             Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.PlayArrow, contentDescription = null)
                 Spacer(Modifier.width(8.dp))

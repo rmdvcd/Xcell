@@ -189,3 +189,31 @@ El **diagnóstico exhaustivo** no usa la red: sigue siendo offline y no necesita
 * Agente: `cd pc-agent && python -m unittest discover -s tests -v` — protocolo,
   emparejamiento, métricas, archivos, relay VPN real por loopback y límites de
   sesión.
+
+## Preferencia de conexión y permisos iniciales
+
+- Orden de descubrimiento: **USB → punto de acceso → misma Wi-Fi**. USB requiere
+  activar «Compartir Internet por USB» en Android; no se usa ADB ni USB serie.
+  El agente sigue escuchando en su IP local (TCP 8787 y UDP 8788).
+- Se priorizan rutas IPv4 directas detectadas por interfaz (`rndis`/`usb`/`ncm`,
+  `ap`/`swlan`/`wlan1`, `wlan`). Los nombres varían por fabricante: un hotspot en
+  `wlan0` puede aparecer como Wi-Fi. No se activan redes ni se cambia un enlace
+  durante una transferencia. Si el descubrimiento está bloqueado, usa la IP manual.
+- Cámara, audio, espejo y archivos: USB suele dar más estabilidad; después,
+  punto de acceso. Teclado, mouse y recursos necesitan poco ancho de banda.
+  No son mediciones de velocidad: todas las herramientas remotas comparten el
+  enlace seleccionado. VPN también lo usa; el escáner local y el diagnóstico
+  no lo necesitan. Solo el barrido LAN del escáner requiere agente.
+- En el primer inicio se muestra una configuración de permisos con solicitud
+  conjunta de cámara, micrófono, teléfono y dispositivos cercanos, según versión.
+  La ubicación para el escáner en Android ≤ 12 requiere marcar explícitamente
+  la opción; nunca se leen coordenadas. Se puede continuar con permisos denegados.
+- Accesibilidad se habilita manualmente en Ajustes; VPN requiere el diálogo de
+  Android y no se inicia hasta elegir rutas en su herramienta. Los archivos usan
+  el selector del sistema, sin permiso global de almacenamiento. El botón
+  «Permisos» del inicio permite revisar o reintentar la configuración.
+
+Validación en sandbox: 21 pruebas del agente aprobadas. Las pruebas Android
+requieren JDK 17 y SDK 35; no están instalados en este entorno. La prioridad de
+interfaces y subredes tiene pruebas JVM; falta validarla en dispositivos físicos
+con USB y hotspot de distintos fabricantes.
