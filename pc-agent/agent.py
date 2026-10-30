@@ -80,7 +80,26 @@ def print_capabilities(server: AgentServer) -> None:
     print()
 
 
+def configure_console() -> None:
+    """Fuerza UTF-8 en la salida para no romper en consolas de Windows.
+
+    ``cmd.exe`` suele usar cp850/cp1252: los caracteres de las cajas y las
+    tildes del informe harían saltar ``UnicodeEncodeError`` con la salida
+    redirigida. Se degrada a ``?`` en vez de abortar.
+    """
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
+
+
 def main() -> int:
+    configure_console()
     parser = argparse.ArgumentParser(description="Agente PC-Móvil de DeviceScope")
     parser.add_argument("--port", type=int, default=protocol.DEFAULT_PORT, help="puerto de control")
     parser.add_argument("--pin", type=str, default=None, help="PIN fijo de 6 dígitos")
