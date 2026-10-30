@@ -25,10 +25,10 @@ val deviceModules: List<DeviceModule> = listOf(
     DeviceModule(
         id = ModuleIds.FULL_DIAGNOSTIC,
         title = "Diagnóstico exhaustivo",
-        summary = "14 grupos de componentes, voltajes y auditoría de falsificaciones",
+        summary = "Componentes, batería y coherencia de datos",
         icon = Icons.Filled.Apps,
         description = "Analiza micrófono, RAM, almacenamiento, antenas y transmisores, pantalla, táctil, bocinas, plugs, batería, cable/cargador, red (Datos/WiFi/Bluetooth), mapa de voltajes internos y todas las propiedades del equipo. Contrasta fuentes independientes para detectar valores falsificados.",
-        privacyNote = "El diagnóstico no usa la red: no tiene permiso INTERNET. No lee ICCID, IMSI, número telefónico ni coordenadas. El audio de la prueba de micrófono se procesa en memoria y no se guarda. Los informes solo se guardan donde tú elijas.",
+        privacyNote = "El diagnóstico funciona sin red. No lee ICCID, IMSI, número telefónico ni coordenadas. El audio de la prueba de micrófono se procesa en memoria y no se guarda. Los informes solo se guardan donde tú elijas.",
         cta = "Iniciar diagnóstico exhaustivo",
     ),
     DeviceModule(

@@ -37,10 +37,13 @@ private object Routes {
 fun DeviceScopeApp() {
     val systemDarkTheme = isSystemInDarkTheme()
     var darkTheme by rememberSaveable { mutableStateOf(systemDarkTheme) }
+    var permissionRequest by rememberSaveable { mutableStateOf(0) }
     DeviceScopeTheme(darkTheme = darkTheme) {
+        StartupPermissions(permissionRequest)
         DeviceScopeContent(
             darkTheme = darkTheme,
             onToggleTheme = { darkTheme = !darkTheme },
+            onPermissions = { permissionRequest++ },
         )
     }
 }
@@ -49,6 +52,7 @@ fun DeviceScopeApp() {
 private fun DeviceScopeContent(
     darkTheme: Boolean,
     onToggleTheme: () -> Unit,
+    onPermissions: () -> Unit,
 ) {
     var lastReport by remember { mutableStateOf<FullDiagnosticReport?>(null) }
     val navController = rememberNavController()
@@ -77,6 +81,7 @@ private fun DeviceScopeContent(
         ) {
             composable(Routes.DASHBOARD) {
                 DashboardScreen(
+                    onPermissions = onPermissions,
                     darkTheme = darkTheme,
                     onToggleTheme = onToggleTheme,
                     lastReport = lastReport,

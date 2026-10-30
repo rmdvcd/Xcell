@@ -83,6 +83,7 @@ fun PcMovilScreen(
     var pairingPin by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var lastDiscoveryAt by remember { mutableStateOf(0L) }
+    var connectionHelp by remember { mutableStateOf(false) }
 
     fun refreshDevices() {
         devices = link.devices()
@@ -96,7 +97,7 @@ fun PcMovilScreen(
             refreshDevices()
             if (announcements.isEmpty()) {
                 message = "No se encontró ningún agente en la red. Comprueba que el agente esté en marcha, " +
-                    "que el teléfono esté en la misma WiFi y que el firewall permita el puerto 8788/UDP."
+                    "USB compartido, punto de acceso o misma Wi-Fi; permite 8788/UDP en el firewall."
             }
         }
     }
@@ -129,6 +130,23 @@ fun PcMovilScreen(
             Spacer(Modifier.width(4.dp))
         },
     ) {
+        PcCard {
+            PcSectionTitle(text = "USB → punto de acceso → misma Wi-Fi")
+            TextButton(onClick = { connectionHelp = !connectionHelp }) {
+                Text(if (connectionHelp) "Ocultar ayuda" else "Configurar conexiones y uso por herramienta")
+            }
+            if (connectionHelp) {
+            Text("1. USB: conecta el cable y activa Compartir Internet por USB.")
+            Text("2. Punto de acceso: actívalo en el móvil y conecta la PC.")
+            Text("3. Misma Wi-Fi: conecta ambos al mismo router.")
+            OutlinedButton(onClick = {
+                runCatching { context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS)) }
+            }) { Text("Configurar conexión") }
+            Text("Inicia el agente en la PC y pulsa Buscar. Las rutas detectadas se ordenan por esa prioridad; elige la PC para conectar. Si no aparece, usa su IP local.")
+            Text("Cámara, audio, espejo y archivos: prefiere USB por estabilidad; luego punto de acceso. Teclado, mouse y recursos funcionan también por Wi-Fi. VPN usa el enlace elegido. El escáner de radios y el diagnóstico no necesitan PC; el barrido LAN sí.")
+            }
+        }
+
         when (state) {
             is PcLinkState.Connected -> ConnectedPanel(
                 link = link,
@@ -261,16 +279,7 @@ fun PcMovilScreen(
             }
         }
 
-        PcNote(
-            text = "El enlace es directo por la red local: sin cuentas, sin nube y sin telemetría. " +
-                "El tráfico no va cifrado, así que úsalo en una red de confianza. El PIN y el token solo " +
-                "impiden que otro equipo de la misma red controle tu PC.",
-        )
-        PcNote(
-            text = "La app ya no es puramente offline: este módulo necesita el permiso INTERNET para hablar con " +
-                "el agente en tu LAN. El diagnóstico exhaustivo sigue funcionando sin red.",
-            isWarning = true,
-        )
+        PcNote(text = "Tráfico sin cifrar. Usa solo conexiones de confianza.", isWarning = true)
     }
 
     if (pairingState != null) {
@@ -511,7 +520,7 @@ private fun ConnectPanel(
         )
         Text(
             text = "En la PC ejecuta «python pc-agent/agent.py» y mira el PIN que imprime. " +
-                "El teléfono tiene que estar en la misma red WiFi.",
+                "Prioridad: USB → punto de acceso → misma Wi-Fi.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

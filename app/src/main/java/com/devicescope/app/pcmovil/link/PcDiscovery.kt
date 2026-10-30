@@ -62,7 +62,7 @@ class PcDiscovery(context: Context) {
                 runCatching { socket?.close() }
                 runCatching { multicastLock?.release() }
             }
-            results.values.sortedBy { it.name.lowercase() }
+            results.values.sortedWith(compareBy({ PcTransport.priority(it.address) }, { it.name.lowercase() }))
         }
 
     /**
