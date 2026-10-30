@@ -15,6 +15,18 @@ cd pc-agent
 python agent.py
 ```
 
+### Windows: doble clic
+
+```bat
+pc-agent\iniciar-agente.bat
+```
+
+Comprueba que hay Python 3.9+, crea `.venv`, instala las dependencias opcionales
+la primera vez, avisa si el puerto 8787 está ocupado, imprime el diagnóstico y
+arranca el agente. Acepta cualquier opción de `agent.py`
+(`iniciar-agente.bat --pin 123456`) y `/sin-extras` para no instalar paquetes.
+Guía completa, firewall y problemas frecuentes: [`WINDOWS.md`](WINDOWS.md).
+
 Salida típica:
 
 ```

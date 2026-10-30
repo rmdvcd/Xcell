@@ -59,6 +59,10 @@ cd pc-agent
 python agent.py        # imprime IP, PIN y capacidades detectadas
 ```
 
+En Windows basta con doble clic en `pc-agent\iniciar-agente.bat`: comprueba
+Python 3.9+, crea el entorno virtual, instala las dependencias opcionales y
+arranca el agente. Guía paso a paso en [`pc-agent/WINDOWS.md`](pc-agent/WINDOWS.md).
+
 En el teléfono: **PC-Móvil → Buscar en la red local → PIN**. Para el sentido
 PC → móvil, activa el servicio en **Ajustes → Accesibilidad → DeviceScope
 PC-Móvil**. Si el firewall pregunta, permite **TCP 8787** y **UDP 8788** en redes
